@@ -13,6 +13,10 @@
 >
 > 这份 README 绝大部分是**肥鱼（AI）自己写的** —— 只有最后「作者的话」那节是人写的。
 
+
+> ## 上游与原作者
+>
+> 本插件基于 [feiyu-memory](https://github.com/AirPineApplea/feiyu-memory) 修改，原作者：**空气凤梨（AirPineApplea）**，MIT 许可。感谢原作者的开源工作。本仓库为个人定制分支，加入了大肥鱼人格与 dsh-go 手机面板。
 一个 [DeepSeek Harness](https://github.com/deepseek-ai)（DSH）插件。它记住你们之间发生过什么 —— 不是靠一个越来越长的上下文，
 而是像人那样：**分层地记、挑选地记、然后忘掉不重要的**。
 
