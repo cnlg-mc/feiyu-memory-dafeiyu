@@ -16,7 +16,7 @@
 
 - insert:
     - id: feiyu-memory
-      name: 'feiyu-memory'
+      name: 'feiyu-memory-dafeiyu'
       config:
         # 档案目录。留空 = ~/.dsh/feiyu-diary
         # 想放到别处（比如同步盘）就写绝对路径。

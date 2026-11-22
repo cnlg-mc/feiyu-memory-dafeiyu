@@ -36,7 +36,7 @@
  * 会做这件事的人不需要面板，需要面板的人不会做这件事。
  */
 window.__ModuleLoader__.load({
-  id: 'feiyu-memory',
+  id: 'feiyu-memory-dafeiyu',
 
   factory: (require) => {
     const React = require('react');
@@ -451,6 +451,6 @@ window.__ModuleLoader__.load({
       );
     }
 
-    return { name: 'feiyu-memory', inject: ['slots'], apply };
+    return { name: 'feiyu-memory-dafeiyu', inject: ['slots'], apply };
   },
 });
