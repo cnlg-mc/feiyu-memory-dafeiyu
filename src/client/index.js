@@ -27,13 +27,9 @@
  * 都伤不到我们。`dsh-context` 就借了那个库，它承担了我们不用承担的风险。
  *
  * ─────────────────────────────────────────────────────────────
- * 界面只有三件事：**看 / 删 / 带走**。
- *
- * 没有搜索、没有标签筛选、没有统计图表、没有设置项 —— 这些在 SPEC 第 0.1
- * 条就被明令砍掉了（"像鱼还是像系统"）。多一个控件就多一分"管理软件"味。
- *
- * 唯一不能省的是**删**：在那之前，想删一条记忆得自己去编辑 jsonl 文件。
- * 会做这件事的人不需要面板，需要面板的人不会做这件事。
+ * 界面与 dsh-go App 版的「肥鱼记忆」面板**保持相同**：四页
+ * 手记 / 人格 / 记忆 / 关于。看、改、删、带走都在这一个面板里，
+ * 网页和手机看到的是同一份档案、同一套操作。
  */
 window.__ModuleLoader__.load({
   id: 'feiyu-memory-dafeiyu',
@@ -47,6 +43,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'feiyu-diary';
     /** 主机的数据接口前缀，和 host 半边的 PANEL_BASE 必须对得上 */
     const API = '/feiyu-diary';
+    const VERSION = '0.3.3';
 
     /**
      * 主题 token。全部走 CSS 变量，浅色/深色自动跟着切换 ——
@@ -67,10 +64,6 @@ window.__ModuleLoader__.load({
 
     /* ───────────────────────── 图标 ───────────────────────── */
 
-    /**
-     * 侧栏图标。owner 会传 `{ size, active }` 进来 ——
-     * 这是 `SidebarPanelIconOwnerProps`，别改成别的 props 名。
-     */
     function Icon(props) {
       const size = props && typeof props.size === 'number' ? props.size : 20;
       const active = Boolean(props && props.active);
@@ -82,7 +75,7 @@ window.__ModuleLoader__.load({
           viewBox: '0 0 24 24',
           fill: 'none',
           role: 'img',
-          'aria-label': '肥鱼日记',
+          'aria-label': '肥鱼记忆',
           style: { display: 'block', opacity: active ? 1 : 0.72 },
         },
         h('ellipse', {
@@ -134,88 +127,6 @@ window.__ModuleLoader__.load({
       );
     }
 
-    /* ───────────────────────── 一条日记 ───────────────────────── */
-
-    function Entry(props) {
-      const e = props.entry;
-      const [confirming, setConfirming] = useState(false);
-      const when = dayLabel(e.created_at);
-
-      return h(
-        'article',
-        {
-          style: {
-            position: 'relative',
-            padding: '12px 14px',
-            marginBottom: 8,
-            borderRadius: 10,
-            background: C.layer1,
-            border: `1px solid ${C.border1}`,
-          },
-        },
-        h(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 6,
-              fontSize: 11,
-              color: C.text2,
-            },
-          },
-          h('span', null, when),
-          // tags（给这条日记贴分类）2026-10-27 停止产出，不再显示。
-          // 老数据还在文件里，要看就翻日记.md 或 jsonl。
-        ),
-        h(
-          'p',
-          { style: { margin: 0, fontSize: 13, lineHeight: 1.75, color: C.text1 } },
-          e.text,
-        ),
-        // 「忘掉」—— 这个面板存在的一半理由
-        h(
-          'div',
-          { style: { marginTop: 8, display: 'flex', justifyContent: 'flex-end' } },
-          confirming
-            ? h(
-                'span',
-                { style: { display: 'inline-flex', gap: 10, alignItems: 'center', fontSize: 12 } },
-                h('span', { style: { color: C.text2 } }, '确定忘掉？'),
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    onClick: () => props.onForget(e.id),
-                    style: linkStyle(C.err),
-                  },
-                  '忘掉',
-                ),
-                h(
-                  'button',
-                  { type: 'button', onClick: () => setConfirming(false), style: linkStyle(C.text2) },
-                  '算了',
-                ),
-              )
-            : h(
-                'button',
-                {
-                  type: 'button',
-                  onClick: () => setConfirming(true),
-                  title: '从档案里删掉这一条',
-                  style: {
-                    ...linkStyle(C.text2),
-                    opacity: props.busy ? 0.5 : 0.75,
-                  },
-                  disabled: Boolean(props.busy),
-                },
-                '忘掉',
-              ),
-        ),
-      );
-    }
-
     function linkStyle(color) {
       return {
         margin: 0,
@@ -230,6 +141,31 @@ window.__ModuleLoader__.load({
         textUnderlineOffset: 3,
       };
     }
+
+    const btnStyle = (primary) => ({
+      padding: '6px 14px',
+      border: primary ? `1px solid ${C.brand}` : `1px solid ${C.border2}`,
+      borderRadius: 6,
+      background: primary ? C.brand : C.layer2,
+      color: primary ? 'var(--dsw-alias-bg-base)' : C.text1,
+      fontSize: 12,
+      cursor: 'pointer',
+      font: 'inherit',
+    });
+
+    const fieldStyle = {
+      boxSizing: 'border-box',
+      width: '100%',
+      padding: '8px 10px',
+      border: `1px solid ${C.border2}`,
+      borderRadius: 6,
+      background: C.layer1,
+      color: C.text1,
+      font: 'inherit',
+      fontSize: 13,
+      lineHeight: 1.6,
+      resize: 'vertical',
+    };
 
     /** 时间说人话：今天 / 昨天 / 3 天前 / 10-05 */
     function dayLabel(ts) {
@@ -247,14 +183,53 @@ window.__ModuleLoader__.load({
       return `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
+    function fmtTime(ms) {
+      if (!Number.isFinite(ms)) return '';
+      const d = new Date(ms);
+      const p = (n) => String(n).padStart(2, '0');
+      return `${d.getMonth() + 1}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+
+    /* ───────────────────────── 一条日记（只读页用） ───────────────────────── */
+
+    function Entry(props) {
+      const e = props.entry;
+      const when = dayLabel(e.created_at);
+      return h(
+        'article',
+        {
+          style: {
+            padding: '12px 14px',
+            marginBottom: 8,
+            borderRadius: 10,
+            background: C.layer1,
+            border: `1px solid ${C.border1}`,
+          },
+        },
+        h('div', { style: { marginBottom: 6, fontSize: 11, color: C.text2 } }, when),
+        h(
+          'p',
+          { style: { margin: 0, fontSize: 13, lineHeight: 1.75, color: C.text1 } },
+          e.text,
+        ),
+      );
+    }
+
     /* ───────────────────────── 主面板 ───────────────────────── */
 
     function Panel() {
       const [phase, setPhase] = useState('loading');
       const [state, setState] = useState(null);
       const [error, setError] = useState('');
-      const [busy, setBusy] = useState('');
+      const [toast, setToast] = useState('');
       const [tick, setTick] = useState(0);
+      const [tab, setTab] = useState('hand');
+
+      // 表单本地状态
+      const [editHand, setEditHand] = useState('');
+      const [editPersona, setEditPersona] = useState('');
+      const [diaryIndex, setDiaryIndex] = useState(1);
+      const [editDiary, setEditDiary] = useState('');
 
       useEffect(() => {
         let alive = true;
@@ -263,6 +238,8 @@ window.__ModuleLoader__.load({
           .then((data) => {
             if (!alive) return;
             setState(data);
+            setEditHand(String(data.hand ?? ''));
+            setEditPersona(String(data.persona ?? ''));
             setPhase('ready');
           })
           .catch((err) => {
@@ -275,42 +252,34 @@ window.__ModuleLoader__.load({
         };
       }, [tick]);
 
-      function forget(id) {
-        setBusy(id);
-        fetch(`${API}/forget`, {
+      function post(path, body, okMsg) {
+        fetch(`${API}/${path}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
+          body: JSON.stringify(body),
         })
-          // ⚠️ **必须检查 r.ok。**
-          //
-          // 这里原来是 `.then((r) => r.json())` —— 服务端回 400/403 时 JSON 照样
-          // 能解析，于是被当成成功，接着刷新一遍、什么都没变。表现就是
-          // **「忘掉按钮点不动」**：没有报错、没有删除、没有任何提示。
-          //
-          // 2026-10-26 社区报的那个 bug，一半就出在这里：把它变成静默。
           .then((r) =>
             r
               .json()
               .catch(() => ({}))
-              .then((body) => {
-                if (!r.ok) throw new Error(body?.error || `HTTP ${r.status}`);
-                return body;
-              }),
+              .then((b) => ({ ok: r.ok, b })),
           )
-          .then(() => {
-            setBusy('');
-            setError('');
+          .then(({ ok, b }) => {
+            if (!ok) throw new Error(b?.error || `HTTP`);
+            setToast(okMsg);
             setTick((n) => n + 1);
           })
-          .catch((err) => {
-            setBusy('');
-            setError(`删不掉：${String((err && err.message) || err)}`);
-          });
+          .catch((err) => setToast(`失败：${String((err && err.message) || err)}`));
       }
 
+      useEffect(() => {
+        if (!toast) return;
+        const t = setTimeout(() => setToast(''), 2600);
+        return () => clearTimeout(t);
+      }, [toast]);
+
       const wrap = { height: '100%', overflowY: 'auto', background: C.bg, color: C.text1 };
-      const inner = { maxWidth: 720, margin: '0 auto', padding: '28px 24px 60px' };
+      const inner = { maxWidth: 720, margin: '0 auto', padding: '24px 24px 60px' };
 
       if (phase === 'loading') {
         return h('div', { style: wrap }, h('div', { style: inner }, h(Empty, { text: '翻档案…' })));
@@ -337,16 +306,24 @@ window.__ModuleLoader__.load({
       }
 
       const d = state || {};
-      const facts = d.facts || {};
-      // traits（印象）2026-10-27 整类下线 —— 面板不显示，固化也不再产出。
-      // 数据还在档案里，要看就翻 relationship.json。
-      const diary = d.diary || [];
-
       const head = [];
       head.push(`本地存储 · ${d.count || 0} 条`);
-      if (facts.days > 0) head.push(`认识 ${facts.days} 天`);
-      if (facts.nickname) head.push(`他管我叫"${facts.nickname}"`);
-      if (d.degraded) head.push('档案只读');
+      if (d.familiarity !== undefined) head.push(`熟悉度 ${Number(d.familiarity).toFixed(2)}`);
+      if (d.dirState) head.push(d.dirState);
+
+      // 记忆页：全部日记（state 里 diary 已是倒序，正序按时间）
+      const events = Array.isArray(d.diary)
+        ? d.diary.slice().sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0))
+        : [];
+      const diaryList = events.map((e, i) => ({ n: i + 1, e }));
+      const sel = events[Math.max(0, Math.min(events.length - 1, Number(diaryIndex) - 1))];
+
+      const tabs = [
+        ['hand', '手记'],
+        ['persona', '人格'],
+        ['memory', '记忆'],
+        ['about', '关于'],
+      ];
 
       return h(
         'div',
@@ -356,19 +333,11 @@ window.__ModuleLoader__.load({
           { style: inner },
 
           // ── 标题 ──
-          h('h2', { style: { margin: 0, fontSize: 18, fontWeight: 600 } }, '肥鱼日记'),
-          h(
-            'p',
-            { style: { margin: '6px 0 0', fontSize: 12, color: C.text2 } },
-            head.join(' · '),
-          ),
+          h('h2', { style: { margin: 0, fontSize: 18, fontWeight: 600 } }, `肥鱼记忆 v${VERSION}`),
+          h('p', { style: { margin: '6px 0 0', fontSize: 12, color: C.text2 } }, head.join(' · ')),
 
-          // ── 出错横幅 ──
-          //
-          // 之前「忘掉」失败是**完全静默**的：服务端回 400/403，前端把 JSON
-          // 当成功、刷新一遍、什么都没变 —— 用户只看到「点不动」。
-          // 现在失败会出现在这里，而且带着服务端说的原因。
-          error !== ''
+          // ── toast ──
+          toast
             ? h(
                 'p',
                 {
@@ -376,59 +345,307 @@ window.__ModuleLoader__.load({
                     margin: '10px 0 0',
                     padding: '8px 10px',
                     fontSize: 12,
-                    lineHeight: 1.6,
-                    color: C.err,
-                    border: `1px solid ${C.err}`,
+                    color: C.text1,
+                    background: C.layer2,
+                    border: `1px solid ${C.border2}`,
                     borderRadius: 6,
                   },
                 },
-                error,
+                toast,
               )
             : null,
 
-          // ── 「我对他的一些印象」（traits）2026-10-27 整栏下线 ──
-          // 注入层、固化侧都删了 —— 面板这里跟着删，不然界面上还挂着一栏，
-          // 而它永远不会再有新内容（只能显示砍之前的老数据）。
-          // 档案里那些 traits 一个字没删，要看就翻 relationship.json。
-
-          // ── 「我最近常说的」（lexicon）2026-10-27 整栏下线 ──
-          // 同一刀：词表不再产出，这栏只剩历史。
-
-          // 「上一棒留下的」那一栏 2026-10-27 整栏下线 ──
-          // 档案里那些 about="self" 的 trait 一个字没删，只是不再显示。
-
-          // 「我还欠着他的」那一栏随功能一起删了（2026-10-24）。
-
-          // ── 日记 ──
+          // ── 页签 ──
           h(
-            Section,
-            { title: '最近的事' },
-            diary.length === 0
-              ? h(Empty, { text: '还没有日记。多聊几句，我就会有东西可记。' })
-              : diary.map((e) => h(Entry, { key: e.id, entry: e, onForget: forget, busy: busy === e.id })),
-          ),
-
-          // 「我最近常说的」2026-10-27 整栏下线（见上面）。
-
-          // ── 带走 ──
-          h(
-            Section,
-            { title: '档案' },
-            h(
-              'a',
-              {
-                href: `${API}/export`,
-                download: '',
-                style: { ...linkStyle(C.brand), fontSize: 13 },
+            'div',
+            {
+              style: {
+                display: 'flex',
+                gap: 4,
+                marginTop: 18,
+                borderBottom: `1px solid ${C.border2}`,
               },
-              '导出档案（.dshpack）',
-            ),
-            h(
-              'p',
-              { style: { margin: '10px 0 0', fontSize: 12, lineHeight: 1.7, color: C.text2 } },
-              '它就是一个普通文件夹，在 ~/.dsh/feiyu-diary/。可以直接打开、改、拷走。',
+            },
+            tabs.map(([key, label]) =>
+              h(
+                'button',
+                {
+                  key,
+                  type: 'button',
+                  onClick: () => setTab(key),
+                  style: {
+                    padding: '8px 12px',
+                    border: 0,
+                    borderBottom: tab === key ? `2px solid ${C.brand}` : '2px solid transparent',
+                    background: 'none',
+                    color: tab === key ? C.brand : C.text2,
+                    fontSize: 13,
+                    fontWeight: tab === key ? 600 : 400,
+                    cursor: 'pointer',
+                    font: 'inherit',
+                  },
+                },
+                label,
+              ),
             ),
           ),
+
+          // ── 手记页 ──
+          tab === 'hand'
+            ? h(
+                'div',
+                null,
+                h(Empty, { text: '手记：留给每一棒的话，每轮都在。' }),
+                h('pre', {
+                  style: {
+                    margin: '12px 0 0',
+                    padding: 12,
+                    background: C.layer1,
+                    border: `1px solid ${C.border1}`,
+                    borderRadius: 8,
+                    fontSize: 12,
+                    lineHeight: 1.7,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    maxHeight: 320,
+                    overflowY: 'auto',
+                  },
+                }, String(d.hand ?? '')),
+                h(
+                  Section,
+                  { title: '编辑手记（整段替换）' },
+                  h('textarea', {
+                    style: { ...fieldStyle, minHeight: 160 },
+                    value: editHand,
+                    maxLength: 2000,
+                    onChange: (ev) => setEditHand(ev.target.value),
+                  }),
+                  h(
+                    'div',
+                    { style: { marginTop: 10, display: 'flex', gap: 8 } },
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: btnStyle(true),
+                        onClick: () => post('saveHand', { text: editHand }, '手记已保存'),
+                      },
+                      '保存手记',
+                    ),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: btnStyle(false),
+                        onClick: () => {
+                          if (window.confirm('确认清空手记？')) post('saveHand', { text: '' }, '手记已清空');
+                        },
+                      },
+                      '清空手记',
+                    ),
+                  ),
+                ),
+              )
+            : null,
+
+          // ── 人格页 ──
+          tab === 'persona'
+            ? h(
+                'div',
+                null,
+                h(Empty, { text: '人格：锚点内是出厂设定，锚点外是后来学的。' }),
+                h('pre', {
+                  style: {
+                    margin: '12px 0 0',
+                    padding: 12,
+                    background: C.layer1,
+                    border: `1px solid ${C.border1}`,
+                    borderRadius: 8,
+                    fontSize: 12,
+                    lineHeight: 1.7,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    maxHeight: 320,
+                    overflowY: 'auto',
+                  },
+                }, String(d.persona ?? '')),
+                h(
+                  Section,
+                  { title: '编辑人格（整段替换，请保留锚点注释）' },
+                  h('textarea', {
+                    style: { ...fieldStyle, minHeight: 160 },
+                    value: editPersona,
+                    maxLength: 2000,
+                    onChange: (ev) => setEditPersona(ev.target.value),
+                  }),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: { ...btnStyle(true), marginTop: 10 },
+                      onClick: () => post('savePersona', { text: editPersona }, '人格已保存'),
+                    },
+                    '保存人格',
+                  ),
+                ),
+              )
+            : null,
+
+          // ── 记忆页 ──
+          tab === 'memory'
+            ? h(
+                'div',
+                null,
+                h(
+                  'p',
+                  { style: { fontSize: 13, color: C.text2, margin: '14px 0 8px' } },
+                  `全部日记（按时间排，共 ${events.length} 条）：`,
+                ),
+                h(
+                  'div',
+                  {
+                    style: {
+                      maxHeight: 300,
+                      overflowY: 'auto',
+                      border: `1px solid ${C.border1}`,
+                      borderRadius: 8,
+                      padding: 8,
+                      background: C.layer1,
+                    },
+                  },
+                  diaryList.length === 0
+                    ? h(Empty, { text: '还没有日记。' })
+                    : diaryList.map(({ n, e }) =>
+                        h(
+                          'div',
+                          {
+                            key: e.id,
+                            style: {
+                              padding: '6px 4px',
+                              borderBottom: `1px solid ${C.border1}`,
+                              fontSize: 12,
+                              color: C.text2,
+                              cursor: 'pointer',
+                            },
+                            onClick: () => {
+                              setDiaryIndex(n);
+                              setEditDiary(String(e.text ?? ''));
+                            },
+                          },
+                          `${n}. ${String(e.text ?? '').slice(0, 40)}${String(e.text ?? '').length > 40 ? '…' : ''}  · ${fmtTime(e.created_at)}`,
+                        ),
+                      ),
+                ),
+                h(
+                  Section,
+                  { title: '编辑第 N 条（序号见上）' },
+                  h(
+                    'div',
+                    { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 } },
+                    h('span', { style: { fontSize: 12, color: C.text2 } }, '第几条'),
+                    h('input', {
+                      type: 'number',
+                      min: 1,
+                      max: events.length || 1,
+                      value: diaryIndex,
+                      style: { ...fieldStyle, width: 90 },
+                      onChange: (ev) => {
+                        const n = Number(ev.target.value);
+                        setDiaryIndex(n);
+                        const t = events[Math.max(0, Math.min(events.length - 1, n - 1))];
+                        setEditDiary(t ? String(t.text ?? '') : '');
+                      },
+                    }),
+                  ),
+                  h('textarea', {
+                    style: { ...fieldStyle, minHeight: 140 },
+                    value: editDiary,
+                    maxLength: 2000,
+                    onChange: (ev) => setEditDiary(ev.target.value),
+                  }),
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      style: { ...btnStyle(true), marginTop: 10 },
+                      onClick: () => post('saveDiary', { index: diaryIndex, text: editDiary }, '日记已保存'),
+                    },
+                    '保存这条',
+                  ),
+                ),
+                h(
+                  Section,
+                  { title: '删除第 N 条' },
+                  h(
+                    'div',
+                    { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+                    h('input', {
+                      type: 'number',
+                      min: 1,
+                      max: events.length || 1,
+                      value: diaryIndex,
+                      style: { ...fieldStyle, width: 90 },
+                      onChange: (ev) => setDiaryIndex(Number(ev.target.value)),
+                    }),
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        style: btnStyle(false),
+                        onClick: () => {
+                          if (window.confirm(`删除第 ${diaryIndex} 条？`)) post('delDiary', { index: diaryIndex }, '已删除这条记忆');
+                        },
+                      },
+                      '删除这条',
+                    ),
+                  ),
+                ),
+              )
+            : null,
+
+          // ── 关于页 ──
+          tab === 'about'
+            ? h(
+                'div',
+                null,
+                h(
+                  Section,
+                  { title: '档案信息' },
+                  h(
+                    'div',
+                    { style: { fontSize: 13, lineHeight: 2 } },
+                    h('div', null, `版本：v${VERSION}`),
+                    h('div', null, `档案目录：${d.dir ?? ''}`),
+                    h('div', null, `熟悉度：${Number(d.familiarity ?? 0).toFixed(2)}`),
+                    h('div', null, `状态：${d.dirState ?? ''}`),
+                  ),
+                ),
+                h(
+                  'p',
+                  { style: { margin: '14px 0 0', padding: 10, fontSize: 12, lineHeight: 1.7, color: C.text2, background: C.layer2, borderRadius: 6 } },
+                  '删掉的记忆会立碑，不会被磁盘合并捞回来。人格与手记的编辑即时写盘。',
+                ),
+                h(
+                  'button',
+                  { type: 'button', style: { ...btnStyle(false), marginTop: 12 }, onClick: () => setTick((n) => n + 1) },
+                  '刷新',
+                ),
+                h(
+                  Section,
+                  { title: '带走' },
+                  h(
+                    'a',
+                    { href: `${API}/export`, download: '', style: { ...linkStyle(C.brand), fontSize: 13 } },
+                    '导出档案（.dshpack）',
+                  ),
+                  h(
+                    'p',
+                    { style: { margin: '10px 0 0', fontSize: 12, lineHeight: 1.7, color: C.text2 } },
+                    '它就是一个普通文件夹。可以直接打开、改、拷走。',
+                  ),
+                ),
+              )
+            : null,
         ),
       );
     }
@@ -436,16 +653,13 @@ window.__ModuleLoader__.load({
     /* ───────────────────────── 注册 ───────────────────────── */
 
     function apply(ctx) {
-      // 侧栏图标。用**自己的 id** —— 复用别人的 id 会顶掉人家的格子。
-      // order 40：排在插件市场(0)和上下文洞察(20)后面，当老三。
       ctx.slots.inject('sidebar.panellist', () =>
         ctx.slots.register(
-          { name: 'sidebar.panellist', id: PANEL_ID, order: 40, label: () => '肥鱼日记' },
+          { name: 'sidebar.panellist', id: PANEL_ID, order: 40, label: () => '肥鱼记忆' },
           Icon,
         ),
       );
 
-      // 主面板。key 必须与侧栏的 id 一致 —— 侧栏按钮就是靠这个 key 找面板的。
       ctx.slots.inject('main', () =>
         ctx.slots.register({ name: 'main', key: PANEL_ID }, Panel),
       );

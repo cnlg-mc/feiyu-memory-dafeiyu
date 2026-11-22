@@ -1959,13 +1959,56 @@ const appendWindow = Number.isFinite(config.appendWindowTurns) ? config.appendWi
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   }
 
+  /* ── 面板读写：网页版 / dsh-go 原生面板共用同一套 ──
+     两条界面通道都操作同一份档案，读写逻辑只在这里写一遍，避免漂移。 */
+
+  const handFilePath = () => path.join(archiveDirectory, HANDNOTE_FILE);
+  async function panelReadHand() {
+    try {
+      return await readFile(handFilePath(), 'utf8');
+    } catch {
+      return '';
+    }
+  }
+  async function panelWriteHand(text) {
+    await mkdir(archiveDirectory, { recursive: true });
+    await writeFile(handFilePath(), String(text ?? ''), 'utf8');
+  }
+  async function panelSavePersona(text) {
+    const t = typeof text === 'string' ? text : '';
+    if (t.trim() === '') throw new Error('人格是空的');
+    archive.persona = ensurePersonaStructure(t);
+    personaBaseline = archive.persona;
+    await persist();
+  }
+  /** 序号（1-based，按时间正序）→ 日记条目。与面板 list 排序一致。 */
+  function panelDiaryByIndex(idx) {
+    const events = archive.diary
+      .filter((e) => e?.kind !== 'note')
+      .slice()
+      .sort((a, b) => (a.updated_at ?? a.created_at) - (b.updated_at ?? b.created_at));
+    const n = Number(idx);
+    return Number.isInteger(n) && n >= 1 && n <= events.length ? events[n - 1] : null;
+  }
+  async function panelSaveDiary(idx, text) {
+    const t = typeof text === 'string' ? text : '';
+    if (t.trim() === '') throw new Error('日记正文是空的');
+    const target = panelDiaryByIndex(idx);
+    if (!target) throw new Error(`序号不对，照着列表填 1 到 ${archive.diary.length}`);
+    target.text = t;
+    target.updated_at = Date.now();
+    index = buildIndex(archive.diary);
+    for (const s of sessionStates.values()) s.renderCache = { turn: -1, text: '' };
+    await persist();
+  }
+
   /**
    * 面板要的那一份状态。
    *
    * **只挑界面用得上的字段**，不把整个档案倒出去 —— 注入用的
    * keywords 索引之类的东西对界面没有意义，多传只是多暴露。
    */
-  function panelState() {
+  async function panelState() {
     const rel = archive.relationship ?? {};
     const since = archive.manifest?.created_at;
     return {
@@ -1973,6 +2016,11 @@ const appendWindow = Number.isFinite(config.appendWindowTurns) ? config.appendWi
       ready,
       degraded,
       count: archive.diary.length,
+      dir: archiveDirectory,
+      dirState: ready ? (degraded ? '档案只读' : '档案可读') : '档案加载中',
+      familiarity: Number(rel.familiarity ?? 0),
+      hand: (await panelReadHand()).slice(0, 7900),
+      persona: String(archive.persona ?? '').slice(0, 7900),
       diary: archive.diary
         .map((e) => ({
           id: e?.id ?? '',
@@ -2021,7 +2069,84 @@ const appendWindow = Number.isFinite(config.appendWindowTurns) ? config.appendWi
           handler: async (req, res) => {
             if (req.method !== 'GET') return panelReply(res, 405, { ok: false, error: 'method' });
             await loadPromise;
-            return panelReply(res, 200, panelState());
+            await drainPromise;
+            await writeChain;
+            return panelReply(res, 200, await panelState());
+          },
+        },
+        {
+          kind: 'exact',
+          path: `${PANEL_BASE}/hand`,
+          handler: async (req, res) => {
+            if (req.method !== 'GET') return panelReply(res, 405, { ok: false, error: 'method' });
+            return panelReply(res, 200, { ok: true, text: await panelReadHand() });
+          },
+        },
+        {
+          kind: 'exact',
+          path: `${PANEL_BASE}/persona`,
+          handler: async (req, res) => {
+            if (req.method !== 'GET') return panelReply(res, 405, { ok: false, error: 'method' });
+            await loadPromise;
+            return panelReply(res, 200, { ok: true, text: String(archive.persona ?? '') });
+          },
+        },
+        {
+          kind: 'exact',
+          path: `${PANEL_BASE}/saveHand`,
+          handler: async (req, res) => {
+            if (req.method !== 'POST') return panelReply(res, 405, { ok: false, error: 'method' });
+            try {
+              const body = await readPanelBody(req);
+              await panelWriteHand(body?.text ?? '');
+              return panelReply(res, 200, { ok: true });
+            } catch (err) {
+              return panelReply(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+            }
+          },
+        },
+        {
+          kind: 'exact',
+          path: `${PANEL_BASE}/savePersona`,
+          handler: async (req, res) => {
+            if (req.method !== 'POST') return panelReply(res, 405, { ok: false, error: 'method' });
+            try {
+              const body = await readPanelBody(req);
+              await panelSavePersona(body?.text);
+              return panelReply(res, 200, { ok: true });
+            } catch (err) {
+              return panelReply(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+            }
+          },
+        },
+        {
+          kind: 'exact',
+          path: `${PANEL_BASE}/saveDiary`,
+          handler: async (req, res) => {
+            if (req.method !== 'POST') return panelReply(res, 405, { ok: false, error: 'method' });
+            try {
+              const body = await readPanelBody(req);
+              await panelSaveDiary(body?.index, body?.text);
+              return panelReply(res, 200, { ok: true });
+            } catch (err) {
+              return panelReply(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+            }
+          },
+        },
+        {
+          kind: 'exact',
+          path: `${PANEL_BASE}/delDiary`,
+          handler: async (req, res) => {
+            if (req.method !== 'POST') return panelReply(res, 405, { ok: false, error: 'method' });
+            try {
+              const body = await readPanelBody(req);
+              const target = panelDiaryByIndex(body?.index);
+              if (!target) return panelReply(res, 400, { ok: false, error: '序号不对' });
+              const removed = await forgetEntry(String(target.id));
+              return panelReply(res, 200, { ok: true, removed });
+            } catch (err) {
+              return panelReply(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+            }
           },
         },
         {
@@ -2069,7 +2194,7 @@ const appendWindow = Number.isFinite(config.appendWindowTurns) ? config.appendWi
         },
       ];
       const disposers = routes.map((r) => scope.webServer.register(r));
-      log(`面板接口已注册：${PANEL_BASE}/{state,forget,export}`);
+      log(`面板接口已注册：${PANEL_BASE}/{state,hand,persona,saveHand,savePersona,saveDiary,delDiary,forget,export}`);
       return () => {
         for (const d of disposers.reverse()) {
           try {
@@ -2524,7 +2649,7 @@ const appendWindow = Number.isFinite(config.appendWindowTurns) ? config.appendWi
       await writeFile(handPath, String(text ?? ''), 'utf8');
     };
 
-    const VERSION = '0.3.1';
+    const VERSION = '0.3.3';
     let selectedDiaryId = ''; // 记忆页当前选中的日记 id
 
     // 序号 → 条目：跟面板 diaryList 排序一致（按时间正序，1-based）
