@@ -2,6 +2,16 @@
 
 > 让新开一个对话，用户依然感觉是同一条鱼 —— 一个记住「我们之间发生过什么」的 DSH 插件。
 
+## 安装（国内直连，不用代理 / git）
+
+npm 包：[**feiyu-memory-dafeiyu**](https://www.npmjs.com/package/feiyu-memory-dafeiyu)
+
+```sh
+dsh plugin --profile web add feiyu-memory-dafeiyu
+```
+
+或在 DSH / dsh-go 的插件市场「添加插件」里直接输入包名 `feiyu-memory-dafeiyu`。装完重启引擎生效。
+
 ## 免责声明
 
 个人学习、研究用的第三方非官方插件，与 DeepSeek 及各服务方**无关联、无授权、无背书**。按「现状」提供，风险自担；请遵守所用服务条款。数据本地存储，不主动上传对话或凭证，请自行保管好账号凭据。
